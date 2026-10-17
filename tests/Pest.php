@@ -1,8 +1,11 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Ispgrid\Documents\Models\DocumentType;
+use Ispgrid\Documents\Models\NumberMode;
 use Tests\TestCase;
 
 /*
@@ -19,3 +22,35 @@ pest()->extend(TestCase::class)
         Storage::fake('addons');
     })
     ->in(__DIR__);
+
+/**
+ * The smallest valid PNG and PDF, so a file's type is detected from its bytes.
+ */
+function pngBytes(): string
+{
+    return base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
+}
+
+function pdfBytes(): string
+{
+    return "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n";
+}
+
+function pngUpload(string $name = 'aadhaar.png'): UploadedFile
+{
+    return UploadedFile::fake()->createWithContent($name, pngBytes());
+}
+
+/**
+ * @param  array<string, mixed>  $attributes
+ */
+function documentType(string $name = 'Aadhaar card', array $attributes = []): DocumentType
+{
+    return DocumentType::query()->create([
+        'name' => $name,
+        'required' => true,
+        'number_mode' => NumberMode::Full,
+        'position' => DocumentType::query()->count() + 1,
+        ...$attributes,
+    ]);
+}
