@@ -4,6 +4,7 @@ namespace Ispgrid\Documents;
 
 use App\Models\Account;
 use App\Models\User;
+use App\Support\ActivityFormatter;
 use App\Support\Addons\AddonSettings;
 use App\Support\Addons\CustomerCards;
 use App\Support\Addons\CustomerFormTabs;
@@ -43,6 +44,22 @@ class DocumentsServiceProvider extends ServiceProvider
 
         // Registered on every core: core 0.1.0's role form refuses to save a role holding a box it does not list.
         Abilities::register($this->app->make(Permissions::class));
+
+        foreach ([
+            'document-uploaded' => fn (): string => __('Document uploaded'),
+            'document-replaced' => fn (): string => __('Document replaced'),
+            'document-edited' => fn (): string => __('Document changed'),
+            'document-deleted' => fn (): string => __('Document deleted'),
+            'document-restored' => fn (): string => __('Document restored'),
+            'document-erased' => fn (): string => __('Document erased'),
+            'document-viewed' => fn (): string => __('Document viewed'),
+            'document-number-shown' => fn (): string => __('ID number shown'),
+            'documents-downloaded' => fn (): string => __('Documents downloaded'),
+            'documents-exported' => fn (): string => __('Documents exported'),
+            'document-numbers-cut' => fn (): string => __('ID numbers cut to the last 4'),
+        ] as $event => $label) {
+            ActivityFormatter::addEventLabel($event, $label);
+        }
 
         // Works on every core, so the documents can always be taken out.
         if ($this->app->runningInConsole()) {
