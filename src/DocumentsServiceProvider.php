@@ -12,6 +12,7 @@ use App\Support\Navigation\Navigation;
 use App\Support\Navigation\NavItem;
 use App\Support\Permissions;
 use Illuminate\Support\ServiceProvider;
+use Ispgrid\Documents\Console\ExportCommand;
 use Livewire\Livewire;
 
 /**
@@ -42,6 +43,11 @@ class DocumentsServiceProvider extends ServiceProvider
 
         // Registered on every core: core 0.1.0's role form refuses to save a role holding a box it does not list.
         Abilities::register($this->app->make(Permissions::class));
+
+        // Works on every core, so the documents can always be taken out.
+        if ($this->app->runningInConsole()) {
+            $this->commands([ExportCommand::class]);
+        }
 
         // Sending a decrypted file needs core 0.1.2. On an older core the add-on only keeps its boxes and its data.
         if (! method_exists(PrivateFile::class, 'contentResponse')) {
