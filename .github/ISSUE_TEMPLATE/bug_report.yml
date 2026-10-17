@@ -1,0 +1,54 @@
+name: Bug report
+description: Something in the Session records add-on does not work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. A security problem goes to private reporting instead (Security, then Report a vulnerability), not here.
+
+        Issues are public: leave out passwords, public IPs and customer data (names, mobiles, usernames, session records).
+  - type: input
+    id: version
+    attributes:
+      label: ISPGrid version
+      description: "The first line of `sudo ispgrid-info`, for example: ISPGrid v0.1.0 (2a3788d)"
+    validations:
+      required: true
+  - type: input
+    id: addon-version
+    attributes:
+      label: Add-on version
+      description: "The \"Add-ons\" row of `sudo ispgrid-info`, for example: ispgrid/documents v0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: ubuntu
+    attributes:
+      label: Ubuntu version
+      options:
+        - "24.04"
+        - "26.04"
+        - Other (say which below)
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did (install, remove, search, export), what you saw (the error, a screenshot), and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Install log
+      description: "For install or remove problems: the last 50 lines of the log (`sudo tail -n 50 /var/log/ispgrid-install.log`)."
+      render: text
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before you send it
+      options:
+        - label: I removed passwords, public IPs and customer data.
+          required: true

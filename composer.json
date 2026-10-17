@@ -1,0 +1,30 @@
+{
+    "name": "ispgrid/documents",
+    "description": "Customer documents for ISPGrid: ID proofs and agreements, photographed or uploaded, kept encrypted.",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Karan",
+            "email": "k@ispgrid.com"
+        }
+    ],
+    "require": {
+        "php": "^8.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Ispgrid\\Documents\\": "src/"
+        }
+    },
+    "extra": {
+        "ispgrid": {
+            "name": "Customer documents",
+            "core": ["0.1"],
+            "databases": ["ispgrid_documents"],
+            "paths": ["documents"],
+            "providers": ["Ispgrid\\Documents\\DocumentsServiceProvider"]
+        }
+    },
+    "minimum-stability": "stable"
+}
