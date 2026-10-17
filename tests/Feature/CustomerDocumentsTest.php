@@ -2,6 +2,7 @@
 
 use App\Models\Account;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Ispgrid\Documents\CustomerDocuments;
@@ -155,4 +156,13 @@ it('lists missing required active types', function () {
     $this->documents->upload($this->account, $aadhaar, pngUpload(), null, $this->staff);
 
     expect($this->documents->missingTypes($this->account)->pluck('name')->all())->toBe(['Photo']);
+});
+
+it('never stores anything but a JPG, PNG or PDF, whatever it is called', function () {
+    $html = UploadedFile::fake()->createWithContent('aadhaar.png', '<html><script>alert(1)</script></html>');
+
+    expect(fn () => $this->documents->upload($this->account, documentType(), $html, null, $this->staff))
+        ->toThrow(InvalidArgumentException::class);
+    expect(Document::withTrashed()->count())->toBe(0)
+        ->and(Storage::disk('addons')->allFiles())->toBe([]);
 });

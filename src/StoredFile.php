@@ -7,6 +7,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Ispgrid\Documents\Models\Document;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
@@ -26,6 +27,11 @@ final class StoredFile
     public function put(int $accountId, UploadedFile $file): array
     {
         $bytes = (string) $file->get();
+
+        if (! ContentRule::allowed($bytes)) {
+            throw new InvalidArgumentException('Only JPG, PNG or PDF files are stored.');
+        }
+
         $path = "documents/{$accountId}/".Str::random(40);
         Storage::disk(self::DISK)->put($path, Crypt::encryptString($bytes));
 

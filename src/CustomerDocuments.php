@@ -99,7 +99,8 @@ final class CustomerDocuments
 
     /**
      * Other customers whose current document holds the same full number (compared on letters and digits, ignoring
-     * case). Types that keep only the last 4 are never compared: 4 characters match far too often.
+     * case); for a customer not saved yet (no id), every customer. Types that keep only the last 4 are never
+     * compared: 4 characters match far too often.
      *
      * @return Collection<int, Account>
      */
@@ -111,7 +112,7 @@ final class CustomerDocuments
 
         $ids = Document::query()
             ->where('number_fingerprint', IdNumber::fingerprint($typedNumber))
-            ->where('account_id', '!=', $account->id)
+            ->when($account->id !== null, fn ($query) => $query->where('account_id', '!=', $account->id))
             ->distinct()
             ->pluck('account_id');
 
