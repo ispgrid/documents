@@ -2,6 +2,7 @@
 
 namespace Ispgrid\Documents;
 
+use App\Support\Addons\AddonSettings;
 use App\Support\Addons\PrivateFile;
 use App\Support\Permissions;
 use Illuminate\Support\ServiceProvider;
@@ -44,5 +45,7 @@ class DocumentsServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'documents');
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
         Livewire::addNamespace('documents', viewPath: __DIR__.'/../resources/views/livewire');
+
+        $this->app->make(AddonSettings::class)->register('ispgrid/documents', 'documents::settings', Abilities::TYPES);
     }
 }
