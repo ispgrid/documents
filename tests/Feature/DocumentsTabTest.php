@@ -152,6 +152,23 @@ it('hides the tab from staff without Upload documents and ignores what they send
     expect(ramesh())->not->toBeNull()->and(Document::query()->count())->toBe(0);
 });
 
+it('refuses a path where a file belongs', function () {
+    newCustomerForm()
+        ->set("addonTabs.documents.files.{$this->aadhaar->id}", 'documents/1/secret')
+        ->call('save')->assertHasErrors(["addonTabs.documents.files.{$this->aadhaar->id}"]);
+});
+
+it('keeps the temporary copy when storing the document fails, so staff can save again', function () {
+    Document::creating(fn () => throw new RuntimeException('database down'));
+    $form = newCustomerForm()->set("addonTabs.documents.files.{$this->aadhaar->id}", pngUpload());
+    $temporary = $form->get("addonTabs.documents.files.{$this->aadhaar->id}");
+
+    $form->call('save')->assertHasNoErrors();
+
+    expect($temporary->exists())->toBeTrue()
+        ->and(Storage::disk('addons')->allFiles())->toBe([]);
+});
+
 it('keeps the number setting of the type', function () {
     $lastFour = documentType('Voter ID', ['number_mode' => NumberMode::LastFour]);
 

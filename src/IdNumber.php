@@ -18,14 +18,14 @@ final class IdNumber
     }
 
     /**
-     * One line of printable characters (any script), 1 to 40 of them.
+     * One line of printable characters (any script), 1 to 40 of them, with at least one letter or digit.
      */
     public static function isValid(string $typed): bool
     {
         $number = self::normalise($typed);
 
         return preg_match('/\p{C}/u', $typed) === 0
-            && $number !== ''
+            && preg_match('/[\p{L}\p{N}]/u', $number) === 1
             && mb_strlen($number) <= self::MAX;
     }
 

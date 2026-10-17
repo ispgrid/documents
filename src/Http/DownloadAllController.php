@@ -17,6 +17,8 @@ use ZipArchive;
  */
 final class DownloadAllController
 {
+    public const MAX_BYTES = 60 * 1024 * 1024;
+
     public function __invoke(int $account, StoredFile $files, CustomerDocuments $documents): Response
     {
         abort_unless(auth()->user()?->can(Abilities::VIEW), 403);
@@ -24,6 +26,8 @@ final class DownloadAllController
         $name = $customer->fullname ?: $customer->username;
         $rows = Document::query()->with('type')->where('account_id', $customer->id)->get();
         abort_if($rows->isEmpty(), 404);
+        // The files are decrypted in memory; past this, documents:export on the server is the way.
+        abort_if($rows->sum('size') > self::MAX_BYTES, 413, __('These documents are too large for one download. Use documents:export on the server.'));
 
         $path = (string) tempnam(sys_get_temp_dir(), 'documents');
 

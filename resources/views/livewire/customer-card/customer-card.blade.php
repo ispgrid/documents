@@ -35,7 +35,7 @@
                                         icon="trash"
                                         class="text-red-600 dark:text-red-400"
                                         wire:click="delete({{ $row['document']['id'] }})"
-                                        wire:confirm="{{ __('Delete the :type of :customer?', ['type' => $row['name'], 'customer' => $this->account->fullname ?: $this->account->username]) }}"
+                                        wire:confirm="{{ __('Delete the :type of :customer?', ['type' => $row['name'], 'customer' => $this->customerName]) }}"
                                     >{{ __('Delete') }}</x-ui.button>
                                 @endif
                             </div>
@@ -52,19 +52,35 @@
                                 @endif
                             @endif
                         </x-ui.text>
-                    @elseif ($this->allowed['upload'])
-                        @if ($row['numbered'])
-                            <x-ui.input wire:model="numbers.{{ $row['type_id'] }}" :label="__('ID number')" maxlength="40" autocomplete="off" />
-                        @endif
-                        <div class="grid gap-3 sm:grid-cols-2">
-                            <x-ui.file-upload wire:model="uploads.{{ $row['type_id'] }}" id="documents-card-photo-{{ $row['type_id'] }}" :label="__('Take photo')" accept="image/*" capture="environment" />
-                            <x-ui.file-upload wire:model="uploads.{{ $row['type_id'] }}" id="documents-card-file-{{ $row['type_id'] }}" :label="__('Choose file')" accept="image/jpeg,image/png,application/pdf" :description="__('JPG, PNG or PDF, up to 10 MB.')" />
-                        </div>
-                        <div>
-                            <x-ui.button size="sm" wire:click="upload({{ $row['type_id'] }})">{{ __('Upload') }}</x-ui.button>
-                        </div>
-                    @else
+                    @elseif (! $this->allowed['upload'])
                         <x-ui.text muted>{{ __('Not uploaded') }}</x-ui.text>
+                    @endif
+
+                    @if ($this->allowed['upload'] && $row['active'])
+                        <details @if ($row['document'] === null) open @endif class="grid gap-3">
+                            <summary class="cursor-pointer text-sm font-medium">{{ $row['document'] === null ? __('Upload') : __('Replace') }}</summary>
+                            <div class="mt-3 grid gap-3">
+                                @if ($row['help'] !== '')
+                                    <x-ui.text muted>{{ $row['help'] }}</x-ui.text>
+                                @endif
+                                @if ($row['numbered'])
+                                    <x-ui.input
+                                        wire:model="numbers.{{ $row['type_id'] }}"
+                                        :label="$row['document'] === null ? __('ID number') : __('New ID number (with the new file)')"
+                                        maxlength="40"
+                                        autocomplete="off"
+                                        :description="$row['document'] === null ? null : __('Leave empty to keep the number on file.')"
+                                    />
+                                @endif
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <x-ui.file-upload wire:model="uploads.{{ $row['type_id'] }}" id="documents-card-photo-{{ $row['type_id'] }}" :label="__('Take photo')" accept="image/*" capture="environment" />
+                                    <x-ui.file-upload wire:model="uploads.{{ $row['type_id'] }}" id="documents-card-file-{{ $row['type_id'] }}" :label="__('Choose file')" accept="image/jpeg,image/png,application/pdf" :description="__('JPG, PNG or PDF, up to 10 MB.')" />
+                                </div>
+                                <div>
+                                    <x-ui.button size="sm" wire:click="upload({{ $row['type_id'] }})">{{ $row['document'] === null ? __('Upload') : __('Replace') }}</x-ui.button>
+                                </div>
+                            </div>
+                        </details>
                     @endif
                 </div>
             @endforeach

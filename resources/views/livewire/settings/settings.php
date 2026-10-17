@@ -110,7 +110,8 @@ new class extends Component
         $this->validate($this->rules());
         $type = $this->editingId === null ? null : DocumentType::query()->findOrFail($this->editingId);
 
-        if ($type?->number_mode === NumberMode::Full && $this->numberMode === NumberMode::LastFour->value) {
+        // Coming to last 4 from full or from none (numbers kept under none may be full ones).
+        if ($type !== null && $type->number_mode !== NumberMode::LastFour && $this->numberMode === NumberMode::LastFour->value) {
             $this->cutCount = Document::withTrashed()->where('document_type_id', $type->id)->whereNotNull('number')->count();
 
             if ($this->cutCount > 0) {
@@ -128,6 +129,14 @@ new class extends Component
     {
         $this->authorize(Abilities::TYPES);
         $this->validate($this->rules());
+
+        // The choice was changed back after the warning: nothing to cut.
+        if ($this->numberMode !== NumberMode::LastFour->value || $this->editingId === null) {
+            $this->cutCount = 0;
+
+            return;
+        }
+
         $type = DocumentType::query()->findOrFail($this->editingId);
         $count = 0;
 

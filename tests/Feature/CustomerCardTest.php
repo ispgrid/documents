@@ -144,6 +144,68 @@ it('downloads all current documents as one zip and logs it', function () {
     unlink($path);
 });
 
+it('lets staff with Upload documents replace a file from the card', function () {
+    $this->actingAs(staffWith(Abilities::UPLOAD));
+
+    card($this->account)->assertSee(__('Replace'))
+        ->set("uploads.{$this->aadhaar->id}", pngUpload('sharper.png'))->call('upload', $this->aadhaar->id)->assertHasNoErrors();
+
+    expect($this->document->fresh()->trashed())->toBeTrue()
+        ->and(Document::query()->sole()->original_name)->toBe('sharper.png')
+        ->and(Document::query()->sole()->number)->toBe('1234 5678 4821');
+});
+
+it('masks the number again once View is taken away', function () {
+    $staff = staffWith(Abilities::VIEW, Abilities::UPLOAD);
+    $this->actingAs($staff);
+    $card = card($this->account)->call('showNumber', $this->document->id)->assertSee('1234 5678 4821');
+
+    revokeBox($staff, Abilities::VIEW);
+
+    $card->call('$refresh')->assertDontSee('1234 5678 4821')->assertSee('xxxx xxxx 4821');
+});
+
+it('edits the number of a document on a switched-off type', function () {
+    $this->actingAs($this->admin);
+    $this->aadhaar->update(['active' => false]);
+
+    card($this->account)->call('edit', $this->document->id)->set('editNumber', '9999 8888 7777')->call('saveEdit')->assertHasNoErrors();
+
+    expect($this->document->fresh()->number)->toBe('9999 8888 7777');
+});
+
+it('shows the type help text where staff upload', function () {
+    $this->actingAs($this->admin);
+    documentType('Customer photo', ['help' => 'Face clearly visible']);
+
+    card($this->account)->assertSee('Face clearly visible');
+});
+
+it('refuses a path or text where a file belongs', function () {
+    $this->actingAs($this->admin);
+    $photo = documentType('Customer photo');
+
+    card($this->account)->set("uploads.{$photo->id}", 'documents/1/secret')->call('upload', $photo->id)->assertHasErrors(["uploads.{$photo->id}"]);
+});
+
+it('refuses Upload once the customer is deleted while the card is open', function () {
+    $this->actingAs($this->admin);
+    $photo = documentType('Customer photo');
+    $card = card($this->account)->assertOk();
+
+    $this->account->delete();
+
+    $card->set("uploads.{$photo->id}", pngUpload())->call('upload', $photo->id)->assertForbidden();
+    expect(Document::query()->where('document_type_id', $photo->id)->count())->toBe(0);
+});
+
+it('refuses a zip too large for one download', function () {
+    $this->actingAs($this->admin);
+    Document::query()->update(['size' => 70 * 1024 * 1024]);
+
+    $this->get(route('documents.zip', $this->account))->assertStatus(413);
+});
+
 it('stops an open card once its box is taken away', function () {
     $staff = staffWith(Abilities::VIEW);
     $this->actingAs($staff);

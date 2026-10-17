@@ -12,6 +12,7 @@ use Illuminate\Validation\ValidationException;
 use Ispgrid\Documents\Models\Document;
 use Ispgrid\Documents\Models\DocumentType;
 use Ispgrid\Documents\Models\NumberMode;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Throwable;
 
 /**
@@ -31,14 +32,21 @@ final class CustomerDocuments
         $stored = $this->files->put($account->id, $file);
 
         try {
-            // A second save that raced past the lock hits the unique current_key; the retry hides its file.
+            // storeRow() locks the type's row, so two saves of one type take turns (a deadlock is retried). A row
+            // written past that lock still hits the unique current_key, and the retry then hides it.
             [$document, $replaced] = retry(2, fn (): array => DB::connection('documents')->transaction(
                 fn (): array => $this->storeRow($account, $type, $stored, $typedNumber, $by),
+                attempts: 3,
             ), 0, fn (Throwable $e): bool => $e instanceof UniqueConstraintViolationException);
         } catch (Throwable $exception) {
             $this->files->erase($stored['path']);
 
             throw $exception;
+        }
+
+        // Only now that the document is safe: the readable copy Livewire kept while staff picked the file.
+        if ($file instanceof TemporaryUploadedFile) {
+            $file->delete();
         }
 
         $this->log($replaced ? 'document-replaced' : 'document-uploaded', $account, $type->name, $by);
@@ -160,6 +168,8 @@ final class CustomerDocuments
      */
     private function storeRow(Account $account, DocumentType $type, array $stored, ?string $typedNumber, User $by): array
     {
+        DocumentType::query()->whereKey($type->id)->lockForUpdate()->first();
+
         $current = Document::query()
             ->where('account_id', $account->id)
             ->where('document_type_id', $type->id)

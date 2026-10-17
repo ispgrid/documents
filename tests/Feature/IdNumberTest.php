@@ -21,6 +21,11 @@ it('takes one line of up to 40 printable characters', function (string $typed, b
     'forty' => [str_repeat('a', 40), true],
 ]);
 
+it('needs at least one letter or digit', function () {
+    expect(IdNumber::isValid('---'))->toBeFalse()
+        ->and(IdNumber::isValid('( )'))->toBeFalse();
+});
+
 it('keeps the last 4 letters or digits', function () {
     expect(IdNumber::lastFour('RJ-13/DLC/12/123456'))->toBe('3456')
         ->and(IdNumber::lastFour('ABCDE1234F'))->toBe('234F')

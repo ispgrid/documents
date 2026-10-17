@@ -97,6 +97,31 @@ it('asks before cutting stored full numbers to the last 4, then cuts them all', 
         ->and(Activity::query()->where('event', 'document-numbers-cut')->sole()->properties['count'])->toBe(2);
 });
 
+it('cuts stored numbers when a type comes to last 4 by way of none', function () {
+    $staff = User::factory()->create();
+    $this->actingAs($staff);
+    $type = documentType();
+    $document = app(CustomerDocuments::class)->upload(Account::factory()->create(), $type, pngUpload(), '1234 5678 4821', $staff);
+    $type->update(['number_mode' => NumberMode::None]);
+
+    Livewire::test('documents::settings')->call('edit', $type->id)->set('numberMode', 'last4')->call('save')
+        ->assertSet('cutCount', 1)->call('cutNumbers');
+
+    expect($document->fresh()->number)->toBe('4821')->and($type->fresh()->number_mode)->toBe(NumberMode::LastFour);
+});
+
+it('does not cut when the choice was changed back after the warning', function () {
+    $staff = User::factory()->create();
+    $this->actingAs($staff);
+    $type = documentType();
+    $document = app(CustomerDocuments::class)->upload(Account::factory()->create(), $type, pngUpload(), '1234 5678 4821', $staff);
+
+    Livewire::test('documents::settings')->call('edit', $type->id)->set('numberMode', 'last4')->call('save')
+        ->set('numberMode', 'full')->call('cutNumbers');
+
+    expect($document->fresh()->number)->toBe('1234 5678 4821');
+});
+
 it('keeps stored numbers when a type stops taking numbers', function () {
     $staff = User::factory()->create();
     $this->actingAs($staff);

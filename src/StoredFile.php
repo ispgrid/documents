@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Ispgrid\Documents\Models\Document;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 /**
  * Document files on the add-on disk, encrypted with the app key under a random name: documents/<customer id>/<40
@@ -20,7 +19,8 @@ final class StoredFile
     public const DISK = 'addons';
 
     /**
-     * Encrypts and stores an upload, then deletes Livewire's readable temporary copy.
+     * Encrypts and stores an upload. Livewire's readable temporary copy is left for the caller to delete once the
+     * document's row is saved.
      *
      * @return array{path: string, mime: string, size: int, original_name: string}
      */
@@ -34,10 +34,6 @@ final class StoredFile
 
         $path = "documents/{$accountId}/".Str::random(40);
         Storage::disk(self::DISK)->put($path, Crypt::encryptString($bytes));
-
-        if ($file instanceof TemporaryUploadedFile) {
-            $file->delete();
-        }
 
         return [
             'path' => $path,

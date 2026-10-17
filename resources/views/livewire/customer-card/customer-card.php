@@ -90,7 +90,7 @@ new class extends Component
     /**
      * One row per active type, and per switched-off type that still has a current file.
      *
-     * @return list<array{type_id: int, name: string, required: bool, numbered: bool, document: ?array{id: int, date: ?string, by: string, number: string, url: string}}>
+     * @return list<array{type_id: int, name: string, help: string, active: bool, required: bool, numbered: bool, document: ?array{id: int, date: ?string, by: string, number: string, url: string}}>
      */
     #[Computed]
     public function rows(): array
@@ -107,6 +107,8 @@ new class extends Component
             return [
                 'type_id' => $type->id,
                 'name' => $type->name,
+                'help' => (string) $type->help,
+                'active' => $type->active,
                 'required' => $type->required && $type->active,
                 'numbered' => $type->number_mode !== NumberMode::None && $type->active,
                 'document' => $document === null ? null : [
@@ -115,7 +117,7 @@ new class extends Component
                     'by' => (string) ($uploaders[$document->uploaded_by] ?? __('Unknown')),
                     'number' => match (true) {
                         $document->number === null => '',
-                        $this->shownId === $document->id => $document->number,
+                        $this->allowed['view'] && $this->shownId === $document->id => $document->number,
                         default => IdNumber::mask($document->number),
                     },
                     'url' => route('documents.file', $document->id),
@@ -125,12 +127,24 @@ new class extends Component
     }
 
     /**
+     * The types a document can be moved to in Edit: the active ones, and the type it has now even when switched off.
+     *
      * @return array<int, string>
      */
     #[Computed]
     public function typeOptions(): array
     {
-        return DocumentType::query()->where('active', true)->orderBy('position')->pluck('name', 'id')->all();
+        $current = $this->editingId === null ? null : Document::query()->whereKey($this->editingId)->value('document_type_id');
+
+        return DocumentType::query()
+            ->where(fn ($query) => $query->where('active', true)->orWhere('id', $current))
+            ->orderBy('position')->pluck('name', 'id')->all();
+    }
+
+    #[Computed]
+    public function customerName(): string
+    {
+        return (string) ($this->account->fullname ?: $this->account->username);
     }
 
     public function showNumber(int $id): void

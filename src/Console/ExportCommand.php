@@ -61,15 +61,15 @@ class ExportCommand extends Command
             $target = $this->freeName($directory, $this->safe($name), pathinfo(StoredFile::downloadName('x', 'x', $row->mime), PATHINFO_EXTENSION));
             file_put_contents($target, $files->read($row));
 
-            fputcsv($index, [
-                $account->fullname,
+            fputcsv($index, array_map($this->cell(...), [
+                (string) $account->fullname,
                 $account->username,
                 $row->type->name,
                 (string) $row->number,
-                $row->created_at?->toDateTimeString(),
+                (string) $row->created_at?->toDateTimeString(),
                 (string) ($staff[$row->uploaded_by] ?? ''),
                 $row->trashed() ? 'yes' : 'no',
-            ], escape: '');
+            ]), escape: '');
         }
 
         fclose($index);
@@ -79,9 +79,22 @@ class ExportCommand extends Command
         return self::SUCCESS;
     }
 
+    /**
+     * A name that stays inside its folder: no slashes or other refused characters, and never "." or "..".
+     */
     private function safe(string $name): string
     {
-        return trim(str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '-', $name)) ?: 'document';
+        $safe = trim(str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '-', $name));
+
+        return $safe === '' || trim($safe, '.') === '' ? 'customer-'.bin2hex($safe) : $safe;
+    }
+
+    /**
+     * A spreadsheet reads a cell starting with = + - @ (or a tab or return) as a formula; a leading ' keeps it text.
+     */
+    private function cell(string $value): string
+    {
+        return preg_match('/^[=+\-@\t\r]/', $value) === 1 ? "'".$value : $value;
     }
 
     /**

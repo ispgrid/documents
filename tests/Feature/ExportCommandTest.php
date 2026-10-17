@@ -54,6 +54,24 @@ it('exports one customer', function () {
     $this->artisan('documents:export', ['folder' => $this->folder.'-x', '--customer' => 'nobody'])->assertFailed();
 });
 
+it('keeps every customer folder inside the export folder', function () {
+    $dots = Account::factory()->create(['username' => '..', 'fullname' => 'Dots']);
+    app(CustomerDocuments::class)->upload($dots, documentType('Photo'), pngUpload(), null, $this->admin);
+
+    $this->artisan('documents:export', ['folder' => $this->folder, '--customer' => '..'])->assertSuccessful();
+
+    expect(file_exists(dirname($this->folder).'/Photo.png'))->toBeFalse()
+        ->and(glob("{$this->folder}/*/Photo.png"))->toHaveCount(1);
+});
+
+it('stops a cell from being read as a formula', function () {
+    $this->ramesh->update(['fullname' => '=HYPERLINK("http://x")']);
+
+    $this->artisan('documents:export', ['folder' => $this->folder, '--customer' => 'ramesh'])->assertSuccessful();
+
+    expect(file_get_contents("{$this->folder}/documents.csv"))->toContain("'=HYPERLINK");
+});
+
 it('refuses a folder that is not empty', function () {
     File::ensureDirectoryExists($this->folder);
     file_put_contents("{$this->folder}/keep.txt", 'mine');
