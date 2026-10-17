@@ -2,7 +2,10 @@
 
 namespace Ispgrid\Documents;
 
+use App\Models\Account;
+use App\Models\User;
 use App\Support\Addons\AddonSettings;
+use App\Support\Addons\CustomerCards;
 use App\Support\Addons\CustomerFormTabs;
 use App\Support\Addons\PrivateFile;
 use App\Support\Permissions;
@@ -49,5 +52,10 @@ class DocumentsServiceProvider extends ServiceProvider
 
         $this->app->make(AddonSettings::class)->register('ispgrid/documents', 'documents::settings', Abilities::TYPES);
         $this->app->make(CustomerFormTabs::class)->register(DocumentsTab::class);
+        $this->app->make(CustomerCards::class)->register(
+            'documents::customer-card',
+            fn (User $user, Account $account): bool => $user->can(Abilities::VIEW) || $user->can(Abilities::UPLOAD),
+            60,
+        );
     }
 }

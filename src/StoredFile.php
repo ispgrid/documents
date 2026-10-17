@@ -52,6 +52,21 @@ final class StoredFile
         return Crypt::decryptString((string) Storage::disk(self::DISK)->get($document->path));
     }
 
+    /**
+     * The name the browser offers: "<customer>_<type>.<ext>", without characters a file system refuses.
+     */
+    public static function downloadName(string $customer, string $typeName, string $mime): string
+    {
+        $extension = match ($mime) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'application/pdf' => 'pdf',
+            default => 'bin',
+        };
+
+        return str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '-', "{$customer}_{$typeName}").'.'.$extension;
+    }
+
     public function erase(string $path): void
     {
         Storage::disk(self::DISK)->delete($path);
