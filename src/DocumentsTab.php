@@ -5,18 +5,24 @@ namespace Ispgrid\Documents;
 use App\Contracts\CustomerFormTab;
 use App\Models\Account;
 use App\Models\User;
+use Closure;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Ispgrid\Documents\Models\Document;
 use Ispgrid\Documents\Models\DocumentType;
 use Ispgrid\Documents\Models\NumberMode;
 
 /**
- * The Documents tab in the customer form: one block per active type, with Take photo and Choose file, saved with the
- * customer. A missing required document only warns. Files are stored after the customer is saved (saved()).
+ * The Documents tab in the customer form: the customer's documents, and upload rows (a type, its ID number when the
+ * type keeps one, and a file) saved with the customer. A type that already has a file is replaced. With "Document
+ * upload is required" on, a customer without any document does not save. Files are stored after the customer is
+ * saved (saved()).
  */
 final class DocumentsTab implements CustomerFormTab
 {
+    public const MAX_ROWS = 10;
+
     public function __construct(private CustomerDocuments $documents) {}
 
     public function key(): string
@@ -40,32 +46,34 @@ final class DocumentsTab implements CustomerFormTab
     }
 
     /**
-     * Empty file and number fields, and "types": what the tab shows (display only, it has no rule, so core drops it
-     * before saving). A stored number is only ever sent masked.
+     * One empty upload row, and what the tab shows (display only: no rule, so core drops it before saving). A stored
+     * number is only ever sent masked.
      *
      * @return array<string, mixed>
      */
     public function state(?Account $account): array
     {
-        $current = $account === null
-            ? new Collection
-            : Document::query()->where('account_id', $account->id)->get()->keyBy('document_type_id');
-        $uploaders = User::query()->whereIn('id', $current->pluck('uploaded_by')->filter())->pluck('name', 'id');
+        $current = $account === null ? new Collection : $this->documents->current($account->id);
+        $uploaders = $this->documents->uploaders($current);
+        $taken = $current->pluck('document_type_id')->all();
+        $types = $this->activeTypes();
 
         return [
-            'files' => [],
-            'numbers' => [],
-            'types' => $this->activeTypes()->mapWithKeys(fn (DocumentType $type): array => [$type->id => [
-                'name' => $type->name,
-                'required' => $type->required,
+            'uploads' => [self::emptyRow()],
+            'documents' => $current->map(fn (Document $document): array => [
+                'type' => $document->type->name,
+                'file' => $document->original_name,
+                'date' => $document->created_at?->toFormattedDateString(),
+                'by' => (string) ($uploaders[$document->uploaded_by] ?? __('Unknown')),
+                'number' => $document->number === null ? '' : IdNumber::mask($document->number),
+            ])->all(),
+            'typeOptions' => $types->mapWithKeys(fn (DocumentType $type): array => [$type->id => in_array($type->id, $taken, true)
+                ? __(':type (replaces the current file)', ['type' => $type->name])
+                : $type->name,
+            ])->all(),
+            'types' => $types->mapWithKeys(fn (DocumentType $type): array => [$type->id => [
                 'help' => (string) $type->help,
                 'numbered' => $type->number_mode !== NumberMode::None,
-                'current' => ($document = $current->get($type->id)) === null ? null : [
-                    'name' => $document->original_name,
-                    'date' => $document->created_at?->toFormattedDateString(),
-                    'by' => (string) ($uploaders[$document->uploaded_by] ?? __('Unknown')),
-                    'number' => $document->number === null ? '' : IdNumber::mask($document->number),
-                ],
             ]])->all(),
         ];
     }
@@ -75,14 +83,12 @@ final class DocumentsTab implements CustomerFormTab
      */
     public function rules(?Account $account): array
     {
-        $types = $this->activeTypes();
-        $numbered = $types->filter(fn (DocumentType $type): bool => $type->number_mode !== NumberMode::None);
-
         return [
-            'files' => ['array', self::keysIn($types)],
-            'files.*' => ['nullable', 'file', 'mimetypes:'.implode(',', ContentRule::TYPES), 'max:10000', new ContentRule],
-            'numbers' => ['array', self::keysIn($numbered)],
-            'numbers.*' => ['nullable', 'string', new NumberRule],
+            'uploads' => ['present', 'array', 'max:'.self::MAX_ROWS, $this->uploadsRule($account)],
+            'uploads.*' => ['nullable', 'array:type,number,file'],
+            'uploads.*.type' => [new PairRule('file', __('Choose the document type.')), 'nullable', Rule::in($this->activeTypes()->pluck('id')->all())],
+            'uploads.*.file' => [new PairRule('type', __('Choose the file.')), 'nullable', 'file', 'mimetypes:'.implode(',', ContentRule::TYPES), 'max:10000', new ContentRule],
+            'uploads.*.number' => ['nullable', 'string', new NumberRule],
         ];
     }
 
@@ -92,20 +98,14 @@ final class DocumentsTab implements CustomerFormTab
      */
     public function warnings(array $state, ?Account $account): array
     {
-        $files = is_array($state['files'] ?? null) ? array_filter($state['files']) : [];
-        $numbers = is_array($state['numbers'] ?? null) ? $state['numbers'] : [];
-        $types = $this->activeTypes();
-        $stored = $account === null ? [] : Document::query()->where('account_id', $account->id)->pluck('document_type_id')->all();
+        $types = $this->activeTypes()->keyBy('id');
+        $warnings = [];
 
-        $missing = $types->filter(fn (DocumentType $type): bool => $type->required
-            && ! in_array($type->id, $stored, true)
-            && ! array_key_exists($type->id, $files));
-        $warnings = $missing->isEmpty() ? [] : [__('Missing documents: :types.', ['types' => $missing->pluck('name')->implode(', ')])];
+        foreach (self::rows($state) as $row) {
+            $type = $types->get((int) ($row['type'] ?? 0));
+            $typed = $row['number'] ?? null;
 
-        foreach ($types as $type) {
-            $typed = $numbers[$type->id] ?? null;
-
-            if (! is_string($typed) || ! IdNumber::isValid($typed)) {
+            if ($type === null || ! is_string($typed) || ! IdNumber::isValid($typed)) {
                 continue;
             }
 
@@ -136,16 +136,57 @@ final class DocumentsTab implements CustomerFormTab
         $types = $this->activeTypes()->keyBy('id');
         $by = auth()->user();
 
-        foreach ((array) ($state['files'] ?? []) as $typeId => $file) {
-            $type = $types->get((int) $typeId);
+        foreach (self::rows($state) as $row) {
+            $type = $types->get((int) ($row['type'] ?? 0));
+            $file = $row['file'] ?? null;
 
             if (! $file instanceof UploadedFile || $type === null || ! $by instanceof User) {
                 continue;
             }
 
-            $number = $state['numbers'][$typeId] ?? null;
+            $number = $type->number_mode === NumberMode::None ? null : ($row['number'] ?? null);
             $this->documents->upload($account, $type, $file, is_string($number) ? $number : null, $by);
         }
+    }
+
+    /**
+     * @return array{type: string, number: string, file: null}
+     */
+    public static function emptyRow(): array
+    {
+        return ['type' => '', 'number' => '', 'file' => null];
+    }
+
+    /**
+     * Each type at most once in a save, and, when uploads are required, at least one document on the customer or
+     * in this save.
+     */
+    private function uploadsRule(?Account $account): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail) use ($account): void {
+            $chosen = array_filter(array_map(
+                fn (array $row): ?string => filled($row['file'] ?? null) && filled($row['type'] ?? null) ? (string) $row['type'] : null,
+                self::rows(['uploads' => $value]),
+            ));
+
+            if (count($chosen) !== count(array_unique($chosen))) {
+                $fail(__('Choose each document type once.'));
+            } elseif ($chosen === [] && UploadRequired::isOn()
+                && ($account === null || ! Document::query()->where('account_id', $account->id)->exists())) {
+                $fail(__('Upload at least one document.'));
+            }
+        };
+    }
+
+    /**
+     * The upload rows of a state, skipping anything that is not a row.
+     *
+     * @param  array<string, mixed>  $state
+     * @return list<array<string, mixed>>
+     */
+    private static function rows(array $state): array
+    {
+        return array_values(array_filter(is_array($state['uploads'] ?? null) ? $state['uploads'] : [], 'is_array'));
     }
 
     /**
@@ -154,15 +195,5 @@ final class DocumentsTab implements CustomerFormTab
     private function activeTypes(): Collection
     {
         return DocumentType::query()->where('active', true)->orderBy('position')->orderBy('id')->get();
-    }
-
-    /**
-     * Only these type ids may appear as keys; none at all when there are none.
-     *
-     * @param  Collection<int, DocumentType>  $types
-     */
-    private static function keysIn(Collection $types): string
-    {
-        return $types->isEmpty() ? 'max:0' : 'array:'.$types->pluck('id')->implode(',');
     }
 }

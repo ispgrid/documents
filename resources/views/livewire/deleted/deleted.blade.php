@@ -1,5 +1,6 @@
 <section class="grid gap-6">
     <div>
+        <x-ui.link href="{{ route('addons.index') }}" wire:navigate class="text-sm">{{ __('Add-ons') }}</x-ui.link>
         <x-ui.heading level="1" size="xl">{{ __('Deleted documents') }}</x-ui.heading>
         <x-ui.text muted class="mt-1">{{ __('Deleted documents are hidden from the customer, not removed. Restore one, or erase it for good.') }}</x-ui.text>
         <x-ui.text muted class="mt-1">{{ __('Backups taken before an erase still hold the file for up to 14 days.') }}</x-ui.text>

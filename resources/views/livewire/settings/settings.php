@@ -11,24 +11,26 @@ use Ispgrid\Documents\IdNumber;
 use Ispgrid\Documents\Models\Document;
 use Ispgrid\Documents\Models\DocumentType;
 use Ispgrid\Documents\Models\NumberMode;
+use Ispgrid\Documents\UploadRequired;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * The add-on's section on System, then Add-ons: the document types the ISP keeps, written by the ISP (nothing is
- * prefilled). A type that ever had a document is switched off, never deleted.
+ * The add-on's section on System, then Add-ons: whether a customer needs a document to save, and the document types
+ * the ISP keeps, written by the ISP (nothing is prefilled). A type that ever had a document is switched off, never
+ * deleted.
  */
 new class extends Component
 {
     use AuthorizesEveryRequest, ShowsToasts;
+
+    public bool $uploadRequired = false;
 
     public ?int $editingId = null;
 
     public string $name = '';
 
     public string $help = '';
-
-    public bool $required = false;
 
     public string $numberMode = 'none';
 
@@ -40,6 +42,7 @@ new class extends Component
     public function mount(): void
     {
         $this->authorizeAccess();
+        $this->uploadRequired = UploadRequired::isOn();
     }
 
     protected function authorizeAccess(): void
@@ -47,8 +50,24 @@ new class extends Component
         $this->authorize(Abilities::TYPES);
     }
 
+    #[Computed]
+    public function canRestore(): bool
+    {
+        return (bool) auth()->user()?->can(Abilities::RESTORE);
+    }
+
     /**
-     * @return list<array{id: int, name: string, required: bool, mode: string, active: bool, first: bool, last: bool}>
+     * Saved as soon as it is ticked or cleared.
+     */
+    public function updatedUploadRequired(): void
+    {
+        $this->authorize(Abilities::TYPES);
+        UploadRequired::put($this->uploadRequired);
+        $this->toast(__('Saved.'));
+    }
+
+    /**
+     * @return list<array{id: int, name: string, mode: string, active: bool, first: bool, last: bool}>
      */
     #[Computed]
     public function rows(): array
@@ -58,7 +77,6 @@ new class extends Component
         return $types->values()->map(fn (DocumentType $type, int $i): array => [
             'id' => $type->id,
             'name' => $type->name,
-            'required' => $type->required,
             'mode' => $type->number_mode->label(),
             'active' => $type->active,
             'first' => $i === 0,
@@ -88,7 +106,6 @@ new class extends Component
         $this->editingId = $type->id;
         $this->name = $type->name;
         $this->help = (string) $type->help;
-        $this->required = $type->required;
         $this->numberMode = $type->number_mode->value;
         $this->cutCount = 0;
         $this->resetErrorBag();
@@ -96,7 +113,7 @@ new class extends Component
 
     public function cancel(): void
     {
-        $this->reset('editingId', 'name', 'help', 'required', 'numberMode', 'cutCount');
+        $this->reset('editingId', 'name', 'help', 'numberMode', 'cutCount');
         $this->resetErrorBag();
     }
 
@@ -196,7 +213,6 @@ new class extends Component
         return [
             'name' => ['required', 'string', 'max:60', Rule::unique('documents.document_types', 'name')->ignore($this->editingId)],
             'help' => ['nullable', 'string', 'max:200'],
-            'required' => ['boolean'],
             'numberMode' => ['required', Rule::enum(NumberMode::class)],
         ];
     }
@@ -206,7 +222,6 @@ new class extends Component
         $values = [
             'name' => trim($this->name),
             'help' => trim($this->help) === '' ? null : trim($this->help),
-            'required' => $this->required,
             'number_mode' => $this->numberMode,
         ];
 

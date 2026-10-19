@@ -75,37 +75,11 @@ it('needs Restore deleted documents for the page', function () {
     $this->get(route('documents.deleted'))->assertForbidden();
 });
 
-it('lists customers missing a required active document', function () {
-    $this->actingAs(staffWith(Abilities::VIEW));
-    $photo = documentType('Customer photo');
-    documentType('Agreement', ['required' => false]);
-    documentType('Old form', ['active' => false]);
-    $complete = Account::factory()->create(['fullname' => 'Complete Customer']);
-    $this->documents->upload($complete, $this->aadhaar, pngUpload(), null, $this->admin);
-    $this->documents->upload($complete, $photo, pngUpload(), null, $this->admin);
-    $half = Account::factory()->create(['fullname' => 'Half Customer']);
-    $this->documents->upload($half, $this->aadhaar, pngUpload(), null, $this->admin);
-    Account::factory()->create(['fullname' => 'Empty Customer']);
-    Account::factory()->create(['fullname' => 'Gone Customer'])->delete();
-
-    $this->get(route('documents.missing'))->assertOk()
-        ->assertSee('Half Customer')->assertSee('Empty Customer')
-        ->assertDontSee('Complete Customer')->assertDontSee('Gone Customer')->assertDontSee('Old form');
-
-    Livewire::test('documents::missing')->set('search', 'half')
-        ->assertSee('Half Customer')->assertSee('Customer photo')->assertDontSee('Empty Customer');
-});
-
-it('needs View customer documents for the missing list', function () {
-    $this->actingAs(staffWith(Abilities::UPLOAD));
-
-    $this->get(route('documents.missing'))->assertForbidden();
-});
-
-it('shows both pages in the Add-ons menu to staff who may open them', function () {
-    $this->actingAs(staffWith(Abilities::VIEW));
-    $this->get(route('dashboard'))->assertSee(route('documents.missing'))->assertDontSee(route('documents.deleted'));
-
+it('links Deleted documents from the documents settings, not the menu', function () {
     $this->actingAs($this->admin);
-    $this->get(route('dashboard'))->assertSee(route('documents.missing'))->assertSee(route('documents.deleted'));
+    $this->get(route('dashboard'))->assertDontSee(route('documents.deleted'));
+    Livewire::test('documents::settings')->assertSee(route('documents.deleted'));
+
+    $this->actingAs(staffWith(Abilities::TYPES));
+    Livewire::test('documents::settings')->assertDontSee(route('documents.deleted'));
 });

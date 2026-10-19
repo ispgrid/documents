@@ -6,6 +6,7 @@ use Illuminate\Http\UploadedFile;
 use Ispgrid\Documents\Abilities;
 use Ispgrid\Documents\CustomerDocuments;
 use Ispgrid\Documents\Models\Document;
+use Ispgrid\Documents\Models\DocumentType;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
@@ -65,16 +66,27 @@ it('shows the full number once and logs it', function () {
     expect(Activity::query()->where('event', 'document-number-shown')->count())->toBe(1);
 });
 
-it('uploads a missing document from the card', function () {
+it('uploads a document of the chosen type from the card', function () {
     $this->actingAs(staffWith(Abilities::UPLOAD));
     $photo = documentType('Customer photo');
 
     card($this->account)
-        ->set("uploads.{$photo->id}", UploadedFile::fake()->createWithContent('a.png', '<html></html>'))->call('upload', $photo->id)
-        ->assertHasErrors(["uploads.{$photo->id}"])
-        ->set("uploads.{$photo->id}", pngUpload('me.png'))->call('upload', $photo->id)->assertHasNoErrors();
+        ->set('uploadType', (string) $photo->id)
+        ->set('uploadFile', UploadedFile::fake()->createWithContent('a.png', '<html></html>'))->call('upload')
+        ->assertHasErrors(['uploadFile'])
+        ->set('uploadFile', pngUpload('me.png'))->call('upload')->assertHasNoErrors()
+        ->assertSet('uploadType', '')->assertSet('uploadFile', null);
 
     expect(Document::query()->where('document_type_id', $photo->id)->sole()->original_name)->toBe('me.png');
+});
+
+it('needs the type and the file in the upload box', function () {
+    $this->actingAs($this->admin);
+
+    card($this->account)->call('upload')
+        ->assertHasErrors(['uploadType' => __('Choose the document type.'), 'uploadFile' => __('Choose the file.')]);
+    card($this->account)->set('uploadType', (string) documentType('Old form', ['active' => false])->id)->set('uploadFile', pngUpload())
+        ->call('upload')->assertHasErrors(['uploadType']);
 });
 
 it('edits the type and number, refusing a taken type', function () {
@@ -120,8 +132,8 @@ it('still shows the documents of a deleted customer, without Upload', function (
     $photo = documentType('Customer photo');
     $this->account->delete();
 
-    card($this->account)->assertOk()->assertSee('xxxx xxxx 4821')->assertDontSee(__('Take photo'))
-        ->set("uploads.{$photo->id}", pngUpload())->call('upload', $photo->id)->assertForbidden();
+    card($this->account)->assertOk()->assertSee('xxxx xxxx 4821')->assertDontSee(__('Choose file'))
+        ->set('uploadType', (string) $photo->id)->set('uploadFile', pngUpload())->call('upload')->assertForbidden();
 });
 
 it('downloads all current documents as one zip and logs it', function () {
@@ -147,8 +159,10 @@ it('downloads all current documents as one zip and logs it', function () {
 it('lets staff with Upload documents replace a file from the card', function () {
     $this->actingAs(staffWith(Abilities::UPLOAD));
 
-    card($this->account)->assertSee(__('Replace'))
-        ->set("uploads.{$this->aadhaar->id}", pngUpload('sharper.png'))->call('upload', $this->aadhaar->id)->assertHasNoErrors();
+    card($this->account)->assertSee(__(':type (replaces the current file)', ['type' => 'Aadhaar card']))
+        ->set('uploadType', (string) $this->aadhaar->id)
+        ->assertSeeHtml('wire:confirm="'.e(__('Replace the :type of :customer? The current file can be restored from Deleted documents.', ['type' => 'Aadhaar card', 'customer' => 'Ramesh Kumar'])).'"')
+        ->set('uploadFile', pngUpload('sharper.png'))->call('upload')->assertHasNoErrors();
 
     expect($this->document->fresh()->trashed())->toBeTrue()
         ->and(Document::query()->sole()->original_name)->toBe('sharper.png')
@@ -178,14 +192,16 @@ it('shows the type help text where staff upload', function () {
     $this->actingAs($this->admin);
     documentType('Customer photo', ['help' => 'Face clearly visible']);
 
-    card($this->account)->assertSee('Face clearly visible');
+    $photo = DocumentType::query()->where('name', 'Customer photo')->sole();
+
+    card($this->account)->assertDontSee('Face clearly visible')->set('uploadType', (string) $photo->id)->assertSee('Face clearly visible');
 });
 
 it('refuses a path or text where a file belongs', function () {
     $this->actingAs($this->admin);
     $photo = documentType('Customer photo');
 
-    card($this->account)->set("uploads.{$photo->id}", 'documents/1/secret')->call('upload', $photo->id)->assertHasErrors(["uploads.{$photo->id}"]);
+    card($this->account)->set('uploadType', (string) $photo->id)->set('uploadFile', 'documents/1/secret')->call('upload')->assertHasErrors(['uploadFile']);
 });
 
 it('refuses Upload once the customer is deleted while the card is open', function () {
@@ -195,7 +211,7 @@ it('refuses Upload once the customer is deleted while the card is open', functio
 
     $this->account->delete();
 
-    $card->set("uploads.{$photo->id}", pngUpload())->call('upload', $photo->id)->assertForbidden();
+    $card->set('uploadType', (string) $photo->id)->set('uploadFile', pngUpload())->call('upload')->assertForbidden();
     expect(Document::query()->where('document_type_id', $photo->id)->count())->toBe(0);
 });
 
@@ -214,4 +230,12 @@ it('stops an open card once its box is taken away', function () {
     revokeBox($staff, Abilities::VIEW);
 
     $card->call('showNumber', $this->document->id)->assertForbidden();
+});
+
+it('offers Download all only when the customer has documents', function () {
+    $this->actingAs($this->admin);
+    $empty = Account::factory()->create();
+
+    card($this->account)->assertSee(route('documents.zip', $this->account->id));
+    card($empty)->assertDontSee(route('documents.zip', $empty->id))->assertSee(__('No documents yet.'));
 });

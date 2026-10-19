@@ -2,7 +2,9 @@
 
 An add-on for [ISPGrid](https://github.com/ispgrid/ispgrid) that keeps each customer's documents: ID proofs, a
 photo, a signed agreement. Staff photograph a card with the phone's camera or upload a PDF while they create the
-customer. Indian ISPs must keep ID proof for every customer; ISPs elsewhere can keep whatever they need.
+customer. Indian ISPs must keep ID proof for every customer; ISPs elsewhere can keep whatever they need. Which
+documents complete a customer's KYC differs from customer to customer (Aadhaar for a person, PAN and GSTIN for a
+business), so the add-on asks only whether a customer needs documents at all.
 
 > [!WARNING]
 > **Preview: not ready for production yet.** Like ISPGrid itself, it can bring breaking changes until v1.0.0. Read the
@@ -11,17 +13,21 @@ customer. Indian ISPs must keep ID proof for every customer; ISPs elsewhere can 
 ## What it does
 
 - **Document types you write:** on System, then Add-ons, add the types your ISP keeps (nothing is prefilled): a
-  name, required or not, a help text for staff (for example "Upload a masked Aadhaar"), and whether to keep an ID
-  number: none, the full number, or only the last 4 characters. One file per type per customer.
-- **Documents tab in the customer form:** for each type, **Take photo** (opens the camera on a phone) or **Choose
-  file**. JPG, PNG or PDF, up to 10 MB, checked by the file's content. A missing required document does not stop the
-  save: the tab shows an amber dot and the customer appears under Missing documents.
-- **Documents card on the customer page:** view a document, upload a missing one, edit its type or number, delete
-  it, or download all of a customer's documents as one zip (for an audit). ID numbers are shown masked
-  (`xxxx xxxx 4821`); **Show** reveals the full number.
-- **Nothing is lost by accident:** Delete hides a document; **Deleted documents** (menu Add-ons) restores it or
-  erases it for good. Replacing a file hides the old one the same way. Documents stay when a customer is deleted.
-- **Missing documents** (menu Add-ons): customers without a required document.
+  name, a help text for staff (for example "Upload a masked Aadhaar"), and whether to keep an ID number: none, the
+  full number, or only the last 4 characters. One file per type per customer.
+- **Document upload is required** (same place): when ticked, a customer cannot be saved, when added or edited,
+  until at least one document is uploaded. Customers you had before ticking it need one the next time they are
+  edited. Off by default.
+- **Documents tab in the customer form:** the customer's documents, and an upload box: pick the type, type the ID
+  number when the type keeps one, **Choose file** (on a phone this also offers the camera). **Add another document**
+  adds a box, so all of a new customer's papers go in with one save. JPG, PNG or PDF, up to 10 MB, checked by the
+  file's content.
+- **Documents card on the customer page:** the documents, 3 to a row (1 on a phone), with View, Edit (type or
+  number) and Delete; one upload box; and Download all, one zip of the customer's documents for an audit. ID
+  numbers are shown masked (`xxxx xxxx 4821`); **Show** reveals the full number.
+- **Nothing is lost by accident:** Delete hides a document; **Deleted documents** (a button in this add-on's
+  settings) restores it or erases it for good. Uploading a type the customer already has replaces the file (it asks
+  first on the customer page) and hides the old one the same way. Documents stay when a customer is deleted.
 - **Everything is on record:** every view, Show, download, upload, change, delete, restore, erase and export is
   written to the Activity log (never the number or the file).
 - **Permissions** on the Roles screen, none given to a role on install (Admin has them all):
@@ -29,7 +35,7 @@ customer. Indian ISPs must keep ID proof for every customer; ISPs elsewhere can 
   deleted documents" and "Document types". Ticking one ticks what it needs (Erase ticks Restore, which ticks View).
 - English and Hindi.
 
-Not yet: blocking a customer's activation until the required documents are in, shrinking photos on the phone.
+Not yet: shrinking photos on the phone before upload.
 
 ## Aadhaar and ID numbers
 

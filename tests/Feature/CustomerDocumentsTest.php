@@ -148,14 +148,17 @@ it('finds a duplicate full number on another customer only', function () {
         ->and($this->documents->duplicates($this->account, documentType('Agreement', ['number_mode' => NumberMode::LastFour]), '1234F'))->toBeEmpty();
 });
 
-it('lists missing required active types', function () {
-    $aadhaar = documentType();
-    documentType('Photo');
-    documentType('Agreement', ['required' => false]);
-    documentType('Old form', ['active' => false]);
+it('lists the current documents in the order of their types, switched-off types too', function () {
+    $agreement = documentType('Agreement');
+    $aadhaar = documentType('Aadhaar card');
     $this->documents->upload($this->account, $aadhaar, pngUpload(), null, $this->staff);
+    $this->documents->upload($this->account, $agreement, pngUpload(), null, $this->staff);
+    $hidden = $this->documents->upload($this->account, documentType('Photo'), pngUpload(), null, $this->staff);
+    $this->documents->delete($hidden, $this->staff);
+    $agreement->update(['active' => false]);
 
-    expect($this->documents->missingTypes($this->account)->pluck('name')->all())->toBe(['Photo']);
+    expect($this->documents->current($this->account->id)->map(fn (Document $document): string => $document->type->name)->all())
+        ->toBe(['Agreement', 'Aadhaar card']);
 });
 
 it('never stores anything but a JPG, PNG or PDF, whatever it is called', function () {

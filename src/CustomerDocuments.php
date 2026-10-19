@@ -128,18 +128,26 @@ final class CustomerDocuments
     }
 
     /**
-     * Active required types this customer has no current file for, in order.
+     * The customer's current documents (switched-off types too), in the order of their types.
      *
-     * @return Collection<int, DocumentType>
+     * @return Collection<int, Document>
      */
-    public function missingTypes(Account $account): Collection
+    public function current(int $accountId): Collection
     {
-        return DocumentType::query()
-            ->where('active', true)
-            ->where('required', true)
-            ->whereNotIn('id', Document::query()->where('account_id', $account->id)->select('document_type_id'))
-            ->orderBy('position')
-            ->get();
+        return Document::query()->with('type')->where('account_id', $accountId)->get()
+            ->sortBy(fn (Document $document): array => [$document->type->position, $document->type->id])
+            ->values();
+    }
+
+    /**
+     * Who uploaded each of these documents, by user id.
+     *
+     * @param  Collection<int, Document>  $documents
+     * @return Collection<int, string>
+     */
+    public function uploaders(Collection $documents): Collection
+    {
+        return User::query()->whereIn('id', $documents->pluck('uploaded_by')->filter())->pluck('name', 'id');
     }
 
     /**

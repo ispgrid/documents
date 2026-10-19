@@ -2,89 +2,77 @@
     <x-ui.card>
         <div class="flex flex-wrap items-center justify-between gap-3">
             <x-ui.heading>{{ __('Documents') }}</x-ui.heading>
-            @if ($this->allowed['view'])
+            @if ($this->allowed['view'] && $this->documents !== [])
                 <x-ui.button size="sm" variant="secondary" icon="arrow-down-tray" :href="route('documents.zip', $accountId)">{{ __('Download all') }}</x-ui.button>
             @endif
         </div>
 
-        @if ($this->rows === [])
-            <x-ui.text muted class="mt-4">{{ __('No document types yet. Add them on System, then Add-ons.') }}</x-ui.text>
-        @endif
-
-        <div class="mt-4 grid gap-4">
-            @foreach ($this->rows as $row)
-                <div wire:key="documents-row-{{ $row['type_id'] }}" class="grid gap-2 border-b border-zinc-200 pb-4 text-sm last:border-0 dark:border-zinc-700">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <div class="font-medium">
-                            {{ $row['name'] }}
-                            @if ($row['required'] && $row['document'] === null)
-                                <x-ui.badge color="amber">{{ __('Missing') }}</x-ui.badge>
-                            @endif
-                        </div>
-
-                        @if ($row['document'] !== null)
-                            <div class="flex flex-wrap gap-1">
+        @if ($this->documents === [])
+            <x-ui.text muted class="mt-4">{{ __('No documents yet.') }}</x-ui.text>
+        @else
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                @foreach ($this->documents as $document)
+                    <div wire:key="documents-card-{{ $document['id'] }}" class="grid content-start gap-1 rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-700">
+                        <div class="font-medium">{{ $document['type'] }}</div>
+                        <x-ui.text muted class="break-all">{{ $document['file'] }}</x-ui.text>
+                        <x-ui.text muted>{{ __('Uploaded :date by :name', ['date' => $document['date'], 'name' => $document['by']]) }}</x-ui.text>
+                        @if ($document['number'] !== '')
+                            <x-ui.text muted>
+                                <span class="font-mono">{{ $document['number'] }}</span>
+                                @if ($this->allowed['view'] && $shownId !== $document['id'])
+                                    <x-ui.button size="sm" variant="ghost" wire:click="showNumber({{ $document['id'] }})">{{ __('Show') }}</x-ui.button>
+                                @endif
+                            </x-ui.text>
+                        @endif
+                        @if ($this->allowed['view'] || $this->allowed['edit'])
+                            <div class="mt-1 flex flex-wrap gap-1">
                                 @if ($this->allowed['view'])
-                                    <x-ui.button size="sm" variant="ghost" icon="eye" :href="$row['document']['url']" target="_blank">{{ __('View') }}</x-ui.button>
+                                    <x-ui.button size="sm" variant="ghost" icon="eye" :href="$document['url']" target="_blank">{{ __('View') }}</x-ui.button>
                                 @endif
                                 @if ($this->allowed['edit'])
-                                    <x-ui.button size="sm" variant="ghost" wire:click="edit({{ $row['document']['id'] }})">{{ __('Edit') }}</x-ui.button>
+                                    <x-ui.button size="sm" variant="ghost" wire:click="edit({{ $document['id'] }})">{{ __('Edit') }}</x-ui.button>
                                     <x-ui.button
                                         size="sm"
                                         variant="ghost"
                                         icon="trash"
                                         class="text-red-600 dark:text-red-400"
-                                        wire:click="delete({{ $row['document']['id'] }})"
-                                        wire:confirm="{{ __('Delete the :type of :customer?', ['type' => $row['name'], 'customer' => $this->customerName]) }}"
+                                        wire:click="delete({{ $document['id'] }})"
+                                        wire:confirm="{{ __('Delete the :type of :customer?', ['type' => $document['type'], 'customer' => $this->customerName]) }}"
                                     >{{ __('Delete') }}</x-ui.button>
                                 @endif
                             </div>
                         @endif
                     </div>
+                @endforeach
+            </div>
+        @endif
 
-                    @if ($row['document'] !== null)
-                        <x-ui.text muted>
-                            {{ __('Uploaded :date by :name', ['date' => $row['document']['date'], 'name' => $row['document']['by']]) }}
-                            @if ($row['document']['number'] !== '')
-                                &middot; <span class="font-mono">{{ $row['document']['number'] }}</span>
-                                @if ($this->allowed['view'] && $shownId !== $row['document']['id'])
-                                    <x-ui.button size="sm" variant="ghost" wire:click="showNumber({{ $row['document']['id'] }})">{{ __('Show') }}</x-ui.button>
-                                @endif
-                            @endif
-                        </x-ui.text>
-                    @elseif (! $this->allowed['upload'])
-                        <x-ui.text muted>{{ __('Not uploaded') }}</x-ui.text>
+        @if ($this->allowed['upload'])
+            @if ($this->uploadTypes === [])
+                <x-ui.text muted class="mt-4">{{ __('No document types yet. Add them on System, then Add-ons.') }}</x-ui.text>
+            @else
+                <form wire:submit="upload" class="mt-4 grid gap-3 rounded-lg border border-zinc-200 p-4 sm:grid-cols-2 lg:grid-cols-3 dark:border-zinc-700">
+                    <x-ui.select
+                        wire:model.live="uploadType"
+                        :label="__('Document type')"
+                        :options="$this->uploadTypes"
+                        :placeholder="__('Choose a type')"
+                        :description="$this->chosen['help']"
+                    />
+                    @if ($this->chosen['numbered'])
+                        <x-ui.input wire:model="uploadNumber" :label="__('ID number')" maxlength="40" autocomplete="off" :description="$this->chosen['confirm'] === null ? null : __('Leave empty to keep the number on file.')" />
                     @endif
-
-                    @if ($this->allowed['upload'] && $row['active'])
-                        <details @if ($row['document'] === null) open @endif class="grid gap-3">
-                            <summary class="cursor-pointer text-sm font-medium">{{ $row['document'] === null ? __('Upload') : __('Replace') }}</summary>
-                            <div class="mt-3 grid gap-3">
-                                @if ($row['help'] !== '')
-                                    <x-ui.text muted>{{ $row['help'] }}</x-ui.text>
-                                @endif
-                                @if ($row['numbered'])
-                                    <x-ui.input
-                                        wire:model="numbers.{{ $row['type_id'] }}"
-                                        :label="$row['document'] === null ? __('ID number') : __('New ID number (with the new file)')"
-                                        maxlength="40"
-                                        autocomplete="off"
-                                        :description="$row['document'] === null ? null : __('Leave empty to keep the number on file.')"
-                                    />
-                                @endif
-                                <div class="grid gap-3 sm:grid-cols-2">
-                                    <x-ui.file-upload wire:model="uploads.{{ $row['type_id'] }}" id="documents-card-photo-{{ $row['type_id'] }}" :label="__('Take photo')" accept="image/*" capture="environment" />
-                                    <x-ui.file-upload wire:model="uploads.{{ $row['type_id'] }}" id="documents-card-file-{{ $row['type_id'] }}" :label="__('Choose file')" accept="image/jpeg,image/png,application/pdf" :description="__('JPG, PNG or PDF, up to 10 MB.')" />
-                                </div>
-                                <div>
-                                    <x-ui.button size="sm" wire:click="upload({{ $row['type_id'] }})">{{ $row['document'] === null ? __('Upload') : __('Replace') }}</x-ui.button>
-                                </div>
-                            </div>
-                        </details>
-                    @endif
-                </div>
-            @endforeach
-        </div>
+                    <x-ui.file-upload wire:model="uploadFile" id="documents-card-file" :label="__('Choose file')" accept="image/jpeg,image/png,application/pdf" :description="__('JPG, PNG or PDF, up to 10 MB.')" />
+                    <div class="sm:col-span-2 lg:col-span-3">
+                        @if ($this->chosen['confirm'] !== null)
+                            <x-ui.button type="submit" size="sm" icon="arrow-up-tray" wire:confirm="{{ $this->chosen['confirm'] }}">{{ __('Upload') }}</x-ui.button>
+                        @else
+                            <x-ui.button type="submit" size="sm" icon="arrow-up-tray">{{ __('Upload') }}</x-ui.button>
+                        @endif
+                    </div>
+                </form>
+            @endif
+        @endif
     </x-ui.card>
 
     @if ($this->allowed['edit'])

@@ -9,8 +9,6 @@ use App\Support\Addons\AddonSettings;
 use App\Support\Addons\CustomerCards;
 use App\Support\Addons\CustomerFormTabs;
 use App\Support\Addons\PrivateFile;
-use App\Support\Navigation\Navigation;
-use App\Support\Navigation\NavItem;
 use App\Support\Permissions;
 use Illuminate\Support\ServiceProvider;
 use Ispgrid\Documents\Console\ExportCommand;
@@ -82,25 +80,5 @@ class DocumentsServiceProvider extends ServiceProvider
             fn (User $user, Account $account): bool => $user->can(Abilities::VIEW) || $user->can(Abilities::UPLOAD),
             60,
         );
-
-        $navigation = $this->app->make(Navigation::class);
-        $navigation->add(new NavItem(
-            group: 'addons',
-            label: fn (): string => __('Missing documents'),
-            route: 'documents.missing',
-            icon: 'clipboard-document-list',
-            active: ['documents.missing'],
-            visible: fn (User $user): bool => $user->can(Abilities::VIEW),
-            order: 20,
-        ));
-        $navigation->add(new NavItem(
-            group: 'addons',
-            label: fn (): string => __('Deleted documents'),
-            route: 'documents.deleted',
-            icon: 'trash',
-            active: ['documents.deleted'],
-            visible: fn (User $user): bool => $user->can(Abilities::RESTORE),
-            order: 21,
-        ));
     }
 }

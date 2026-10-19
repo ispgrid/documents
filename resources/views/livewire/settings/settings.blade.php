@@ -1,4 +1,16 @@
 <div class="grid gap-4">
+    <x-ui.checkbox
+        wire:model.live="uploadRequired"
+        :label="__('Document upload is required')"
+        :description="__('A customer cannot be saved, when added or edited, until at least one document is uploaded.')"
+    />
+
+    @if ($this->canRestore)
+        <div>
+            <x-ui.button size="sm" variant="secondary" icon="trash" :href="route('documents.deleted')">{{ __('Deleted documents') }}</x-ui.button>
+        </div>
+    @endif
+
     <x-ui.text muted>{{ __('The documents your staff keep for each customer. A type that has documents can be switched off but not deleted.') }}</x-ui.text>
 
     @error('types')
@@ -17,9 +29,6 @@
                 <tr wire:key="document-type-{{ $row['id'] }}">
                     <x-ui.td class="font-medium">
                         {{ $row['name'] }}
-                        @if ($row['required'])
-                            <x-ui.badge color="blue">{{ __('Required') }}</x-ui.badge>
-                        @endif
                         @unless ($row['active'])
                             <x-ui.badge>{{ __('Off') }}</x-ui.badge>
                         @endunless
@@ -51,7 +60,6 @@
             <x-ui.select wire:model="numberMode" :label="__('ID number')" :options="$this->modes" />
         </div>
         <x-ui.input wire:model="help" :label="__('Help text')" maxlength="200" :description="__('Shown to staff when they upload, e.g. Upload a masked Aadhaar (first 8 digits hidden).')" />
-        <x-ui.checkbox wire:model="required" :label="__('Required for every customer')" :description="__('A customer without it still saves; staff see a warning and the customer is listed under Missing documents.')" />
 
         @if ($cutCount > 0)
             <x-ui.alert variant="warning">

@@ -18,8 +18,8 @@ final class NumberRule implements DataAwareRule, ValidationRule
     private array $data = [];
 
     /**
-     * @param  string|null  $fileField  the field holding the file this number goes with; by default the number's own
-     *                                  path with "numbers" turned into "files"
+     * @param  string|null  $fileField  the field holding the file this number goes with; by default "file" next to
+     *                                  the number in the same upload row
      */
     public function __construct(private ?string $fileField = null) {}
 
@@ -41,7 +41,7 @@ final class NumberRule implements DataAwareRule, ValidationRule
             return;
         }
 
-        $fileField = $this->fileField ?? preg_replace('/\.numbers\.([^.]+)$/', '.files.$1', $attribute);
+        $fileField = $this->fileField ?? preg_replace('/[^.]+$/', 'file', $attribute);
 
         if (data_get($this->data, (string) $fileField) === null) {
             $fail(__('Add the file for this number.'));

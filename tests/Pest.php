@@ -74,7 +74,6 @@ function documentType(string $name = 'Aadhaar card', array $attributes = []): Do
 {
     return DocumentType::query()->create([
         'name' => $name,
-        'required' => true,
         'number_mode' => NumberMode::Full,
         'position' => DocumentType::query()->count() + 1,
         ...$attributes,

@@ -9,6 +9,7 @@ use Ispgrid\Documents\IdNumber;
 use Ispgrid\Documents\Models\Document;
 use Ispgrid\Documents\Models\DocumentType;
 use Ispgrid\Documents\Models\NumberMode;
+use Ispgrid\Documents\UploadRequired;
 use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
 
@@ -26,7 +27,7 @@ it('adds and renames a type, keeping names unique and short', function () {
     $this->actingAs(User::factory()->create());
 
     Livewire::test('documents::settings')
-        ->set('name', 'Aadhaar card')->set('help', 'Upload a masked Aadhaar')->set('required', true)->set('numberMode', 'full')
+        ->set('name', 'Aadhaar card')->set('help', 'Upload a masked Aadhaar')->set('numberMode', 'full')
         ->call('save')->assertHasNoErrors()
         ->set('name', 'Aadhaar card')->call('save')->assertHasErrors(['name'])
         ->set('name', str_repeat('a', 61))->call('save')->assertHasErrors(['name'])
@@ -34,7 +35,7 @@ it('adds and renames a type, keeping names unique and short', function () {
         ->set('numberMode', 'everything')->set('help', '')->call('save')->assertHasErrors(['numberMode']);
 
     $type = DocumentType::query()->sole();
-    expect($type->only(['name', 'help', 'required']))->toBe(['name' => 'Aadhaar card', 'help' => 'Upload a masked Aadhaar', 'required' => true])
+    expect($type->only(['name', 'help']))->toBe(['name' => 'Aadhaar card', 'help' => 'Upload a masked Aadhaar'])
         ->and($type->number_mode)->toBe(NumberMode::Full);
 
     Livewire::test('documents::settings')->call('edit', $type->id)->assertSet('name', 'Aadhaar card')
@@ -144,4 +145,25 @@ it('stops an open settings section once the box is taken away', function () {
 
     $component->set('name', 'Sneaky')->assertForbidden();
     expect(DocumentType::query()->count())->toBe(0);
+});
+
+it('switches Document upload is required on and off', function () {
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test('documents::settings')->assertSet('uploadRequired', false)->set('uploadRequired', true);
+    expect(UploadRequired::isOn())->toBeTrue();
+
+    Livewire::test('documents::settings')->assertSet('uploadRequired', true)->set('uploadRequired', false);
+    expect(UploadRequired::isOn())->toBeFalse();
+});
+
+it('refuses the switch once the Document types box is taken away', function () {
+    $staff = staffWith(Abilities::TYPES);
+    $this->actingAs($staff);
+    $settings = Livewire::test('documents::settings');
+
+    revokeBox($staff, Abilities::TYPES);
+
+    $settings->set('uploadRequired', true)->assertForbidden();
+    expect(UploadRequired::isOn())->toBeFalse();
 });

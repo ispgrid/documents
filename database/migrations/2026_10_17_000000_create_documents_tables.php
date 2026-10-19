@@ -25,7 +25,6 @@ return new class extends Migration
                 $table->id();
                 $table->string('name', 60)->unique();
                 $table->string('help', 200)->nullable();
-                $table->boolean('required')->default(false);
                 $table->string('number_mode', 5)->default('none');
                 $table->unsignedInteger('position')->default(0);
                 $table->boolean('active')->default(true);

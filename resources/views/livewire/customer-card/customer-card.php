@@ -3,7 +3,7 @@
 use App\Livewire\Concerns\AuthorizesEveryRequest;
 use App\Livewire\Concerns\ShowsToasts;
 use App\Models\Account;
-use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Ispgrid\Documents\Abilities;
 use Ispgrid\Documents\ContentRule;
@@ -19,9 +19,10 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 
 /**
- * The Documents card on the customer page (deleted customers too). What each staff member may do follows their
- * boxes: View customer documents opens files and numbers, Upload documents adds files, Edit and delete documents
- * changes or hides them.
+ * The Documents card on the customer page (deleted customers too): the current documents, and one upload box (a
+ * type, its ID number when the type keeps one, a file). What each staff member may do follows their boxes: View
+ * customer documents opens files and numbers, Upload documents adds files, Edit and delete documents changes or
+ * hides them.
  */
 new class extends Component
 {
@@ -30,17 +31,11 @@ new class extends Component
     #[Locked]
     public int $accountId;
 
-    /**
-     * New files by type id, and the number typed with each.
-     *
-     * @var array<int|string, mixed>
-     */
-    public array $uploads = [];
+    public string $uploadType = '';
 
-    /**
-     * @var array<int|string, mixed>
-     */
-    public array $numbers = [];
+    public string $uploadNumber = '';
+
+    public mixed $uploadFile = null;
 
     /**
      * The document whose full number is shown.
@@ -88,42 +83,64 @@ new class extends Component
     }
 
     /**
-     * One row per active type, and per switched-off type that still has a current file.
+     * The current documents, in the order of their types (switched-off types too).
      *
-     * @return list<array{type_id: int, name: string, help: string, active: bool, required: bool, numbered: bool, document: ?array{id: int, date: ?string, by: string, number: string, url: string}}>
+     * @return list<array{id: int, type: string, file: string, date: ?string, by: string, number: string, url: string}>
      */
     #[Computed]
-    public function rows(): array
+    public function documents(): array
     {
-        $documents = Document::query()->where('account_id', $this->accountId)->get()->keyBy('document_type_id');
-        $uploaders = User::query()->whereIn('id', $documents->pluck('uploaded_by')->filter())->pluck('name', 'id');
-        $types = DocumentType::query()
-            ->where(fn ($query) => $query->where('active', true)->orWhereIn('id', $documents->keys()))
-            ->orderBy('position')->orderBy('id')->get();
+        $documents = app(CustomerDocuments::class)->current($this->accountId);
+        $uploaders = app(CustomerDocuments::class)->uploaders($documents);
 
-        return $types->map(function (DocumentType $type) use ($documents, $uploaders): array {
-            $document = $documents->get($type->id);
+        return $documents->map(fn (Document $document): array => [
+            'id' => $document->id,
+            'type' => $document->type->name,
+            'file' => $document->original_name,
+            'date' => $document->created_at?->toFormattedDateString(),
+            'by' => (string) ($uploaders[$document->uploaded_by] ?? __('Unknown')),
+            'number' => match (true) {
+                $document->number === null => '',
+                $this->allowed['view'] && $this->shownId === $document->id => $document->number,
+                default => IdNumber::mask($document->number),
+            },
+            'url' => route('documents.file', $document->id),
+        ])->all();
+    }
 
-            return [
-                'type_id' => $type->id,
-                'name' => $type->name,
-                'help' => (string) $type->help,
-                'active' => $type->active,
-                'required' => $type->required && $type->active,
-                'numbered' => $type->number_mode !== NumberMode::None && $type->active,
-                'document' => $document === null ? null : [
-                    'id' => $document->id,
-                    'date' => $document->created_at?->toFormattedDateString(),
-                    'by' => (string) ($uploaders[$document->uploaded_by] ?? __('Unknown')),
-                    'number' => match (true) {
-                        $document->number === null => '',
-                        $this->allowed['view'] && $this->shownId === $document->id => $document->number,
-                        default => IdNumber::mask($document->number),
-                    },
-                    'url' => route('documents.file', $document->id),
-                ],
-            ];
-        })->values()->all();
+    /**
+     * The active types for the upload box; a type that already has a file says it is replaced.
+     *
+     * @return array<int, string>
+     */
+    #[Computed]
+    public function uploadTypes(): array
+    {
+        $taken = Document::query()->where('account_id', $this->accountId)->pluck('document_type_id')->all();
+
+        return $this->activeTypes()->mapWithKeys(fn (DocumentType $type): array => [$type->id => in_array($type->id, $taken, true)
+            ? __(':type (replaces the current file)', ['type' => $type->name])
+            : $type->name,
+        ])->all();
+    }
+
+    /**
+     * The type chosen in the upload box: its help text, whether it keeps an ID number, and the confirm when it
+     * replaces a file.
+     *
+     * @return array{help: ?string, numbered: bool, confirm: ?string}
+     */
+    #[Computed]
+    public function chosen(): array
+    {
+        $type = $this->activeTypes()->firstWhere('id', (int) $this->uploadType);
+        $replaces = $type !== null && Document::query()->where('account_id', $this->accountId)->where('document_type_id', $type->id)->exists();
+
+        return [
+            'help' => $type?->help,
+            'numbered' => $type !== null && $type->number_mode !== NumberMode::None,
+            'confirm' => $replaces ? __('Replace the :type of :customer? The current file can be restored from Deleted documents.', ['type' => $type->name, 'customer' => $this->customerName]) : null,
+        ];
     }
 
     /**
@@ -155,19 +172,26 @@ new class extends Component
         app(CustomerDocuments::class)->log('document-number-shown', $this->account, $document->type->name, auth()->user());
     }
 
-    public function upload(int $typeId): void
+    /**
+     * Stores the file as the customer's document of the chosen type, replacing (hiding) one already there.
+     */
+    public function upload(): void
     {
         $this->authorize(Abilities::UPLOAD);
         abort_if($this->account->trashed(), 403);
-        $type = DocumentType::query()->where('active', true)->findOrFail($typeId);
         $this->validate([
-            "uploads.{$typeId}" => ['required', 'file', 'mimetypes:'.implode(',', ContentRule::TYPES), 'max:10000', new ContentRule],
-            "numbers.{$typeId}" => ['nullable', 'string', new NumberRule("uploads.{$typeId}")],
+            'uploadType' => ['required', Rule::in($this->activeTypes()->pluck('id')->all())],
+            'uploadFile' => ['required', 'file', 'mimetypes:'.implode(',', ContentRule::TYPES), 'max:10000', new ContentRule],
+            'uploadNumber' => ['nullable', 'string', new NumberRule('uploadFile')],
+        ], [
+            'uploadType.required' => __('Choose the document type.'),
+            'uploadFile.required' => __('Choose the file.'),
         ]);
-        $number = $this->numbers[$typeId] ?? null;
+        $type = DocumentType::query()->findOrFail((int) $this->uploadType);
+        $number = $type->number_mode === NumberMode::None || trim($this->uploadNumber) === '' ? null : $this->uploadNumber;
 
-        app(CustomerDocuments::class)->upload($this->account, $type, $this->uploads[$typeId], is_string($number) ? $number : null, auth()->user());
-        unset($this->uploads[$typeId], $this->numbers[$typeId]);
+        app(CustomerDocuments::class)->upload($this->account, $type, $this->uploadFile, $number, auth()->user());
+        $this->reset('uploadType', 'uploadNumber', 'uploadFile');
         $this->toast(__(':type saved.', ['type' => $type->name]));
     }
 
@@ -221,6 +245,14 @@ new class extends Component
     private function document(int $id): Document
     {
         return Document::query()->with('type')->where('account_id', $this->accountId)->findOrFail($id);
+    }
+
+    /**
+     * @return Collection<int, DocumentType>
+     */
+    private function activeTypes(): Collection
+    {
+        return DocumentType::query()->where('active', true)->orderBy('position')->orderBy('id')->get();
     }
 
     private function can(string $box): bool
