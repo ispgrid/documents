@@ -8,6 +8,7 @@ use App\Support\ActivityFormatter;
 use App\Support\Addons\AddonSettings;
 use App\Support\Addons\CustomerCards;
 use App\Support\Addons\CustomerFormTabs;
+use App\Support\Addons\CustomerTabs;
 use App\Support\Addons\PrivateFile;
 use App\Support\Permissions;
 use Illuminate\Support\ServiceProvider;
@@ -75,10 +76,13 @@ class DocumentsServiceProvider extends ServiceProvider
 
         $this->app->make(AddonSettings::class)->register('ispgrid/documents', 'documents::settings', Abilities::TYPES);
         $this->app->make(CustomerFormTabs::class)->register(DocumentsTab::class);
-        $this->app->make(CustomerCards::class)->register(
-            'documents::customer-card',
-            fn (User $user, Account $account): bool => $user->can(Abilities::VIEW) || $user->can(Abilities::UPLOAD),
-            60,
-        );
+        $visible = fn (User $user, Account $account): bool => $user->can(Abilities::VIEW) || $user->can(Abilities::UPLOAD);
+
+        // A tab on the customer page from core 0.1.2 on (after Connection), a card before it.
+        if (class_exists(CustomerTabs::class)) {
+            $this->app->make(CustomerTabs::class)->register('documents', fn (): string => __('Documents'), 'documents::customer-card', $visible, 50);
+        } else {
+            $this->app->make(CustomerCards::class)->register('documents::customer-card', $visible, 60);
+        }
     }
 }

@@ -23,13 +23,16 @@ function card(Account $account): Testable
     return Livewire::test('documents::customer-card', ['accountId' => $account->id]);
 }
 
-it('shows the card only to staff with View customer documents or Upload documents', function () {
+it('shows the Documents tab only to staff with View customer documents or Upload documents', function () {
+    $documentsTab = route('customers.show', [$this->account, 'tab' => 'documents']);
+
     $this->actingAs(staffWith('view-customers'));
-    $this->get(route('customers.show', $this->account))->assertOk()->assertDontSee('xxxx xxxx 4821');
+    $this->get($documentsTab)->assertOk()->assertDontSee('$set(\'tab\', \'documents\')', false)->assertDontSee('xxxx xxxx 4821');
     card($this->account)->assertForbidden();
 
     $this->actingAs(staffWith(Abilities::VIEW));
-    $this->get(route('customers.show', $this->account))->assertOk()->assertSee('xxxx xxxx 4821')->assertDontSee('1234 5678 4821');
+    $this->get(route('customers.show', $this->account))->assertOk()->assertSee('$set(\'tab\', \'documents\')', false)->assertDontSee('xxxx xxxx 4821');
+    $this->get($documentsTab)->assertOk()->assertSee('xxxx xxxx 4821')->assertDontSee('1234 5678 4821');
 });
 
 it('lets staff with Upload documents only add files, not open them', function () {
