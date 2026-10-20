@@ -22,7 +22,7 @@ business), so the add-on asks only whether a customer needs documents at all.
   number when the type keeps one, **Choose file** (on a phone this also offers the camera). **Add another document**
   adds a box, so all of a new customer's papers go in with one save. JPG, PNG or PDF, up to 10 MB, checked by the
   file's content.
-- **Documents card on the customer page:** the documents, 3 to a row (1 on a phone), with View, Edit (type or
+- **Documents tab on the customer page:** the documents, 3 to a row (1 on a phone), with View, Edit (type or
   number) and Delete; one upload box; and Download all, one zip of the customer's documents for an audit. ID
   numbers are shown masked (`xxxx xxxx 4821`); **Show** reveals the full number.
 - **Nothing is lost by accident:** Delete hides a document; **Deleted documents** (a button in this add-on's
@@ -62,7 +62,7 @@ Not yet: shrinking photos on the phone before upload.
 
 ## Taking documents out
 
-- **One customer, for an audit:** Download all on the customer's Documents card (one zip, logged).
+- **One customer, for an audit:** Download all on the customer's Documents tab (one zip, logged).
 - **Everything, for leaving ISPGrid:** on the server,
 
   ```bash
@@ -92,7 +92,7 @@ its files (`storage/app/private/addons/documents`).
 sudo /opt/ispgrid/deploy/install.sh --remove-addon=ispgrid/documents
 ```
 
-The tab, card and pages go away, but the documents are kept: installing the add-on again shows them as they were. To
+The tabs and pages go away, but the documents are kept: installing the add-on again shows them as they were. To
 delete every document too:
 
 ```bash
