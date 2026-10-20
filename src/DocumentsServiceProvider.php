@@ -2,9 +2,17 @@
 
 namespace Ispgrid\Documents;
 
+use App\Models\Account;
+use App\Models\User;
+use App\Support\ActivityFormatter;
+use App\Support\Addons\AddonSettings;
+use App\Support\Addons\CustomerCards;
+use App\Support\Addons\CustomerFormTabs;
+use App\Support\Addons\CustomerTabs;
 use App\Support\Addons\PrivateFile;
 use App\Support\Permissions;
 use Illuminate\Support\ServiceProvider;
+use Ispgrid\Documents\Console\ExportCommand;
 use Livewire\Livewire;
 
 /**
@@ -36,6 +44,27 @@ class DocumentsServiceProvider extends ServiceProvider
         // Registered on every core: core 0.1.0's role form refuses to save a role holding a box it does not list.
         Abilities::register($this->app->make(Permissions::class));
 
+        foreach ([
+            'document-uploaded' => fn (): string => __('Document uploaded'),
+            'document-replaced' => fn (): string => __('Document replaced'),
+            'document-edited' => fn (): string => __('Document changed'),
+            'document-deleted' => fn (): string => __('Document deleted'),
+            'document-restored' => fn (): string => __('Document restored'),
+            'document-erased' => fn (): string => __('Document erased'),
+            'document-viewed' => fn (): string => __('Document viewed'),
+            'document-number-shown' => fn (): string => __('ID number shown'),
+            'documents-downloaded' => fn (): string => __('Documents downloaded'),
+            'documents-exported' => fn (): string => __('Documents exported'),
+            'document-numbers-cut' => fn (): string => __('ID numbers cut to the last 4'),
+        ] as $event => $label) {
+            ActivityFormatter::addEventLabel($event, $label);
+        }
+
+        // Works on every core, so the documents can always be taken out.
+        if ($this->app->runningInConsole()) {
+            $this->commands([ExportCommand::class]);
+        }
+
         // Sending a decrypted file needs core 0.1.2. On an older core the add-on only keeps its boxes and its data.
         if (! method_exists(PrivateFile::class, 'contentResponse')) {
             return;
@@ -44,5 +73,16 @@ class DocumentsServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'documents');
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
         Livewire::addNamespace('documents', viewPath: __DIR__.'/../resources/views/livewire');
+
+        $this->app->make(AddonSettings::class)->register('ispgrid/documents', 'documents::settings', Abilities::TYPES);
+        $this->app->make(CustomerFormTabs::class)->register(DocumentsTab::class);
+        $visible = fn (User $user, Account $account): bool => $user->can(Abilities::VIEW) || $user->can(Abilities::UPLOAD);
+
+        // A tab on the customer page from core 0.1.2 on (after Connection), a card before it.
+        if (class_exists(CustomerTabs::class)) {
+            $this->app->make(CustomerTabs::class)->register('documents', fn (): string => __('Documents'), 'documents::customer-card', $visible, 50);
+        } else {
+            $this->app->make(CustomerCards::class)->register('documents::customer-card', $visible, 60);
+        }
     }
 }
