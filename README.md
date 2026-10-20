@@ -77,11 +77,14 @@ Not yet: shrinking photos on the phone before upload.
 ## Install
 
 It needs ISPGrid 0.1.2 or newer (on an older ISPGrid it only adds its permissions and keeps its data). On a server
-set up with the ISPGrid installer, as root:
+set up with the ISPGrid installer:
 
 ```bash
-sudo /opt/ispgrid/deploy/install.sh --addon=ispgrid/documents
+sudo ispgrid addon add ispgrid/documents
 ```
+
+On ISPGrid 0.1.2, which has no `ispgrid` command, use
+`sudo /opt/ispgrid/deploy/install.sh --addon=ispgrid/documents`.
 
 The installer keeps the add-on on every upgrade, and the nightly backup keeps its database `ispgrid_documents` and
 its files (`storage/app/private/addons/documents`).
@@ -89,14 +92,14 @@ its files (`storage/app/private/addons/documents`).
 ## Remove
 
 ```bash
-sudo /opt/ispgrid/deploy/install.sh --remove-addon=ispgrid/documents
+sudo ispgrid addon remove ispgrid/documents
 ```
 
 The tabs and pages go away, but the documents are kept: installing the add-on again shows them as they were. To
 delete every document too:
 
 ```bash
-sudo /opt/ispgrid/deploy/install.sh --remove-addon=ispgrid/documents --delete-data
+sudo ispgrid addon remove ispgrid/documents --delete-data
 ```
 
 The backup taken at the start of that run keeps a copy for 14 days; after that the documents cannot be brought back.
