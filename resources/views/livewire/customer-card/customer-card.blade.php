@@ -51,7 +51,7 @@
             @if ($this->uploadTypes === [])
                 <x-ui.text muted class="mt-4">{{ __('No document types yet. Add them on System, then Add-ons.') }}</x-ui.text>
             @else
-                <form wire:submit="upload" class="mt-4 grid gap-3 rounded-lg border border-zinc-200 p-4 sm:grid-cols-2 lg:grid-cols-3 dark:border-zinc-700">
+                <form wire:submit="saveDocument" class="mt-4 grid gap-3 rounded-lg border border-zinc-200 p-4 sm:grid-cols-2 lg:grid-cols-3 dark:border-zinc-700">
                     <x-ui.select
                         wire:model.live="uploadType"
                         :label="__('Document type')"

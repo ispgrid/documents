@@ -175,7 +175,7 @@ new class extends Component
     /**
      * Stores the file as the customer's document of the chosen type, replacing (hiding) one already there.
      */
-    public function upload(): void
+    public function saveDocument(): void
     {
         $this->authorize(Abilities::UPLOAD);
         abort_if($this->account->trashed(), 403);

@@ -75,9 +75,9 @@ it('uploads a document of the chosen type from the card', function () {
 
     card($this->account)
         ->set('uploadType', (string) $photo->id)
-        ->set('uploadFile', UploadedFile::fake()->createWithContent('a.png', '<html></html>'))->call('upload')
+        ->set('uploadFile', UploadedFile::fake()->createWithContent('a.png', '<html></html>'))->call('saveDocument')
         ->assertHasErrors(['uploadFile'])
-        ->set('uploadFile', pngUpload('me.png'))->call('upload')->assertHasNoErrors()
+        ->set('uploadFile', pngUpload('me.png'))->call('saveDocument')->assertHasNoErrors()
         ->assertSet('uploadType', '')->assertSet('uploadFile', null);
 
     expect(Document::query()->where('document_type_id', $photo->id)->sole()->original_name)->toBe('me.png');
@@ -86,10 +86,10 @@ it('uploads a document of the chosen type from the card', function () {
 it('needs the type and the file in the upload box', function () {
     $this->actingAs($this->admin);
 
-    card($this->account)->call('upload')
+    card($this->account)->call('saveDocument')
         ->assertHasErrors(['uploadType' => __('Choose the document type.'), 'uploadFile' => __('Choose the file.')]);
     card($this->account)->set('uploadType', (string) documentType('Old form', ['active' => false])->id)->set('uploadFile', pngUpload())
-        ->call('upload')->assertHasErrors(['uploadType']);
+        ->call('saveDocument')->assertHasErrors(['uploadType']);
 });
 
 it('edits the type and number, refusing a taken type', function () {
@@ -136,7 +136,7 @@ it('still shows the documents of a deleted customer, without Upload', function (
     $this->account->delete();
 
     card($this->account)->assertOk()->assertSee('xxxx xxxx 4821')->assertDontSee(__('Choose file'))
-        ->set('uploadType', (string) $photo->id)->set('uploadFile', pngUpload())->call('upload')->assertForbidden();
+        ->set('uploadType', (string) $photo->id)->set('uploadFile', pngUpload())->call('saveDocument')->assertForbidden();
 });
 
 it('downloads all current documents as one zip and logs it', function () {
@@ -165,7 +165,7 @@ it('lets staff with Upload documents replace a file from the card', function () 
     card($this->account)->assertSee(__(':type (replaces the current file)', ['type' => 'Aadhaar card']))
         ->set('uploadType', (string) $this->aadhaar->id)
         ->assertSeeHtml('wire:confirm="'.e(__('Replace the :type of :customer? The current file can be restored from Deleted documents.', ['type' => 'Aadhaar card', 'customer' => 'Ramesh Kumar'])).'"')
-        ->set('uploadFile', pngUpload('sharper.png'))->call('upload')->assertHasNoErrors();
+        ->set('uploadFile', pngUpload('sharper.png'))->call('saveDocument')->assertHasNoErrors();
 
     expect($this->document->fresh()->trashed())->toBeTrue()
         ->and(Document::query()->sole()->original_name)->toBe('sharper.png')
@@ -204,7 +204,7 @@ it('refuses a path or text where a file belongs', function () {
     $this->actingAs($this->admin);
     $photo = documentType('Customer photo');
 
-    card($this->account)->set('uploadType', (string) $photo->id)->set('uploadFile', 'documents/1/secret')->call('upload')->assertHasErrors(['uploadFile']);
+    card($this->account)->set('uploadType', (string) $photo->id)->set('uploadFile', 'documents/1/secret')->call('saveDocument')->assertHasErrors(['uploadFile']);
 });
 
 it('refuses Upload once the customer is deleted while the card is open', function () {
@@ -214,7 +214,7 @@ it('refuses Upload once the customer is deleted while the card is open', functio
 
     $this->account->delete();
 
-    $card->set('uploadType', (string) $photo->id)->set('uploadFile', pngUpload())->call('upload')->assertForbidden();
+    $card->set('uploadType', (string) $photo->id)->set('uploadFile', pngUpload())->call('saveDocument')->assertForbidden();
     expect(Document::query()->where('document_type_id', $photo->id)->count())->toBe(0);
 });
 
