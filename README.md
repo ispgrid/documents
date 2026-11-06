@@ -26,7 +26,7 @@ business), so the add-on asks only whether a customer needs documents at all.
   number) and Delete; one upload box; and Download all, one zip of the customer's documents for an audit. ID
   numbers are shown masked (`xxxx xxxx 4821`); **Show** reveals the full number.
 - **Nothing is lost by accident:** Delete hides a document; **Deleted documents** (a button in this add-on's
-  settings) restores it or erases it for good. Uploading a type the customer already has replaces the file (it asks
+  settings) opens it to look, restores it or erases it for good. Uploading a type the customer already has replaces the file (it asks
   first on the customer page) and hides the old one the same way. Documents stay when a customer is deleted.
 - **Everything is on record:** every view, Show, download, upload, change, delete, restore, erase and export is
   written to the Activity log (never the number or the file).

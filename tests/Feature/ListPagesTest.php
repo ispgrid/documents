@@ -69,6 +69,14 @@ it('never restores or erases a current document from this page', function () {
     expect($document->fresh())->not->toBeNull();
 });
 
+it('links each deleted document to its file', function () {
+    $this->actingAs($this->admin);
+    $document = $this->documents->upload(Account::factory()->create(), $this->aadhaar, pngUpload(), null, $this->admin);
+    $this->documents->delete($document, $this->admin);
+
+    Livewire::test('documents::deleted')->assertSee(route('documents.file', $document->id));
+});
+
 it('needs Restore deleted documents for the page', function () {
     $this->actingAs(staffWith(Abilities::VIEW, Abilities::EDIT));
 
