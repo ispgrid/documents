@@ -54,9 +54,23 @@ it('opens a document decrypted and logs the view', function () {
         ->and(Activity::query()->where('event', 'document-viewed')->sole()->subject_id)->toBe($this->account->id);
 });
 
-it('does not open a hidden document from the card route', function () {
+it('opens a hidden document only for staff who may restore it, and logs it as deleted', function () {
+    app(CustomerDocuments::class)->delete($this->document, $this->admin);
+
+    $this->actingAs(staffWith(Abilities::VIEW));
+    $this->get(route('documents.file', $this->document))->assertNotFound();
+
+    $this->actingAs(staffWith(Abilities::RESTORE));
+    $response = $this->get(route('documents.file', $this->document))->assertOk()->assertHeader('Content-Type', 'image/png');
+
+    expect($response->getContent())->toBe(pngBytes())
+        ->and(Activity::query()->where('event', 'document-viewed')->sole()->properties['deleted'])->toBeTrue();
+});
+
+it('does not open an erased document', function () {
     $this->actingAs($this->admin);
     app(CustomerDocuments::class)->delete($this->document, $this->admin);
+    app(CustomerDocuments::class)->erase(Document::onlyTrashed()->findOrFail($this->document->id), $this->admin);
 
     $this->get(route('documents.file', $this->document))->assertNotFound();
 });

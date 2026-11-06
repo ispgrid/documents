@@ -30,6 +30,7 @@
                 <x-ui.td>{{ $row['type'] }}</x-ui.td>
                 <x-ui.td>{{ __(':date by :name', ['date' => $row['deleted'], 'name' => $row['by']]) }}</x-ui.td>
                 <x-ui.td class="text-end whitespace-nowrap">
+                    <x-ui.button size="sm" variant="ghost" icon="eye" href="{{ route('documents.file', $row['id']) }}" target="_blank" rel="noopener">{{ __('View') }}</x-ui.button>
                     <x-ui.button size="sm" variant="ghost" icon="arrow-uturn-left" wire:click="restore({{ $row['id'] }})">{{ __('Restore') }}</x-ui.button>
                     @if ($this->canErase)
                         <x-ui.button
